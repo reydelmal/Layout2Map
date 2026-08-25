@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Niterra Layout Interactivo</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body, html { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+    #factory-map {
+      width: 100vw;
+      height: 100vh;
+      background-color: #0f172a;
+    }
+
+    /* Customizing Leaflet Popups to look like Google Maps cards */
+    .leaflet-popup-content-wrapper {
+      background: #1e293b;
+      color: #f8fafc;
+      border-radius: 12px;
+      padding: 0;
+      overflow: hidden;
+      border: 1px solid #334155;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+    .leaflet-popup-content {
+      margin: 0 !important;
+      width: 500px !important;
+    }
+    .leaflet-popup-tip {
+      background: #1e293b;
+    }
+    
+    .popup-card a {
+      display: block;
+      text-decoration: none;
+    }
+    .popup-card img {
+      width: 100%;
+      height: 300px;
+      object-fit: contain;
+      display: block;
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+    .popup-card img:hover {
+      opacity: 0.85;
+    }
+    .popup-info {
+      padding: 12px 16px 16px;
+    }
+
+
+    /* Badges Row */
+    .popup-badge-group {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    .popup-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+    .badge-online { background: #059669; color: #ecfdf5; }
+    .badge-maint { background: #d97706; color: #fffbeb; }
+    .badge-id { background: #0284c7; color: #ffffff; }
+    .badge-coords { background: #334155; color: #38bdf8; border: 1px solid #475569; font-family: monospace; }
+
+    .popup-title { font-size: 1rem; font-weight: 600; margin-bottom: 4px; color: #f1f5f9; }
+    .popup-desc { font-size: 0.8rem; color: #94a3b8; line-height: 1.4; }
+
+/* Custom dark tooltip on hover */
+.custom-hover-tooltip {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+  border: 1px solid #38bdf8 !important;
+  border-radius: 6px !important;
+  font-weight: 600 !important;
+  font-size: 0.85rem !important;
+  padding: 6px 10px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Tooltip arrow color styling */
+.custom-hover-tooltip::before {
+  border-top-color: #38bdf8 !important;
+}
+
+
+    /* Custom Header Banner */
+    .map-header {
+      position: absolute;
+      top: 16px;
+      left: 60px;
+      z-index: 1000;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid #334155;
+      backdrop-filter: blur(8px);
+      padding: 10px 18px;
+      border-radius: 8px;
+      color: white;
+    }
+    .map-header h1 { font-size: 1rem; font-weight: 600; }
+    .map-header p { font-size: 0.75rem; color: #94a3b8; }
+
+    /* Search Box Styles */
+    .search-container {
+      position: absolute;
+      top: 25px;
+      left: 320px;
+      z-index: 1000;
+      width: 300px;
+    }
+    .search-input {
+      width: 100%;
+      height: 40px;
+      padding: 0 14px 0 36px;
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: #f8fafc;
+      font-size: 0.85rem;
+      backdrop-filter: blur(8px);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .search-input:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+    }
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 20px; /* Centers vertically within the 40px input box */
+      transform: translateY(-50%);
+      color: #94a3b8;
+      font-size: 0.85rem;
+      pointer-events: none;
+      z-index: 10; /* Keeps icon layered above the input box background */
+    }
+    .search-results {
+      position: absolute;
+      top: 46px;
+      left: 0;
+      right: 0;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      max-height: 250px;
+      overflow-y: auto;
+      display: none;
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5);
+      z-index: 1001;
+    }
+    .search-results.active { display: block; }
+    .search-item {
+      padding: 10px 14px;
+      cursor: pointer;
+      color: #f8fafc;
+      font-size: 0.85rem;
+      border-bottom: 1px solid #334155;
+      transition: background 0.15s;
+    }
+    .search-item:last-child { border-bottom: none; }
+    .search-item:hover { background: #0284c7; }
+    .search-item-sub { display: block; font-size: 0.75rem; color: #94a3b8; margin-top: 2px; }
+    .search-item:hover .search-item-sub { color: #e0f2fe; }
+
+    /* Live Cursor Coordinate Tracker Box */
+    .coord-tracker {
+      position: absolute; bottom: 20px; left: 20px; z-index: 1000;
+      background: rgba(15, 23, 42, 0.85); color: #f8fafc;
+      border: 1px solid #334155; backdrop-filter: blur(8px);
+      padding: 8px 14px; border-radius: 8px; font-family: monospace;
+      font-size: 0.85rem; pointer-events: none; box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      display: flex; gap: 12px; align-items: center;
+    }
+    .coord-value { color: #38bdf8; font-weight: 700; }
+
+  </style>
+</head>
+<body>
+
+  <div class="map-header">
+    <h1>Niterra planta Reynosa</h1>
+    <p>Layout Cam/Crank Shaft sensors & mods </p>
+  </div>
+
+  <div style="position: absolute; top: 80px; left: 60px; z-index: 1000;">
+    <a href="../index.html" style="
+      background: #1e293b; color: #38bdf8; text-decoration: none; 
+      padding: 10px 16px; border-radius: 8px; border: 1px solid #334155;
+      font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+      ← Back to Layout Index
+    </a>
+  </div>
+
+  <!-- Search Component -->
+  <div class="search-container">
+    <span class="search-icon">🔍</span>
+    <input type="text" id="search-input" class="search-input" placeholder="Search station, machine ID, or description..." autocomplete="off">
+    <div id="search-results" class="search-results"></div>
+  </div>
+
+  <div id="factory-map"></div>
+
+  <!-- Coordinate Display Panel -->
+  <div class="coord-tracker" id="coord-tracker">
+    <span>X: <span class="coord-value" id="coord-x">0</span> px</span>
+    <span>Y: <span class="coord-value" id="coord-y">0</span> px</span>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    // Master registry array for search filtering
+    const markersList = [];
+
+    // 1. Initialize Leaflet map with Flat Pixel Coordinate System (CRS.Simple)
+    const map = L.map('factory-map', {
+      crs: L.CRS.Simple,
+      minZoom: -2,
+      maxZoom: 2,
+      zoomControl: true
+    });
+
+    // 2. Define map bounds (Width x Height in pixels of your blueprint image)
+    const imgWidth = 4456;
+    const imgHeight = 1532;
+
+    const bounds = [[0, 0], [imgHeight, imgWidth]];
+
+    // 3. Add floor plan image overlay
+    const imageUrl = "CRANKS/layout-CRANKS.png";
+    L.imageOverlay(imageUrl, bounds).addTo(map);
+
+    const centerPoint = [imgHeight / 2, imgWidth / 2];
+
+    // Center map directly on the middle pixel
+    map.setView(centerPoint, -1);
+
+    // Force Leaflet to recalculate map dimensions and center
+    setTimeout(() => {
+      map.invalidateSize();
+      map.fitBounds(bounds);
+    }, 100);
+
+ // 4. Helper function to create Google-Maps-style marker pins
+    function addFactoryPin(y, x, title, machineId, badgeText, isOnline, description, photoUrl) {
+      const customIcon = L.divIcon({
+        className: 'custom-pin',
+        html: `
+          <div style="
+            background: ${isOnline ? '#0284c7' : '#d97706'};
+            width: 32px; height: 32px; border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            display: flex; align-items: center; justify-content: center;
+            border: 2px solid #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            cursor: pointer;
+          ">
+            <div style="width: 10px; height: 10px; background: white; border-radius: 50%; transform: rotate(45deg);"></div>
+          </div>
+        `,
+        iconSize: [32, 32],
+        iconAnchor: [16, 32],
+        popupAnchor: [0, -32]
+      });
+
+
+ // Construct Popup HTML with ID, Coordinates Badges, and clickable image
+      const popupContent = `
+        <div class="popup-card">
+          <a href="${photoUrl}" target="_blank" rel="noopener noreferrer" title="Click to view full image in a new tab">
+            <img src="${photoUrl}" alt="${title}">
+          </a>
+          <div class="popup-info">
+            <div class="popup-badge-group">
+              <span class="popup-badge ${isOnline ? 'badge-online' : 'badge-maint'}">${badgeText}</span>
+              <span class="popup-badge badge-id">ID: ${machineId}</span>
+              <span class="popup-badge badge-coords">X: ${x} | Y: ${y}</span>
+            </div>
+            <div class="popup-title">${title}</div>
+            <div class="popup-desc">${description}</div>
+          </div>
+        </div>
+      `;
+
+
+      const marker = L.marker([y, x], { icon: customIcon })
+        .addTo(map)
+        .bindPopup(popupContent);
+
+      // Register pin data in master search array
+      markersList.push({
+        y, x, title, machineId, badgeText, description, photoUrl, marker
+      });
+    }
+
+    // --- CURSOR COORDINATE TRACKER LOGIC ---
+    const coordX = document.getElementById('coord-x');
+    const coordY = document.getElementById('coord-y');
+
+    map.on('mousemove', function (e) {
+      const x = Math.round(e.latlng.lng);
+      const y = Math.round(e.latlng.lat);
+
+      if (x >= 0 && x <= imgWidth && y >= 0 && y <= imgHeight) {
+        coordX.innerText = x;
+        coordY.innerText = y;
+      } else {
+        coordX.innerText = 'Out of bounds';
+        coordY.innerText = 'Out of bounds';
+      }
+    });
+
+    // --- SEARCH FUNCTIONALITY LOGIC ---
+    const searchInput = document.getElementById('search-input');
+    const searchResults = document.getElementById('search-results');
+
+    searchInput.addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase().trim();
+      searchResults.innerHTML = '';
+
+      if (query.length === 0) {
+        searchResults.classList.remove('active');
+        return;
+      }
+
+      // Filter pins matching Title, Machine ID, Description, or Badge Text
+      const filtered = markersList.filter(item => 
+        item.title.toLowerCase().includes(query) || 
+        item.machineId.toLowerCase().includes(query) ||
+        item.description.toLowerCase().includes(query) ||
+        item.badgeText.toLowerCase().includes(query)
+      );
+
+      if (filtered.length === 0) {
+        searchResults.innerHTML = `<div class="search-item" style="color:#94a3b8;">No matching locations found</div>`;
+      } else {
+        filtered.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'search-item';
+          div.innerHTML = `
+            <strong>${item.title}</strong> (ID: ${item.machineId})
+            <span class="search-item-sub">${item.description}</span>
+          `;
+          
+          div.addEventListener('click', () => {
+            map.flyTo([item.y, item.x], 0, { duration: 1 });
+            setTimeout(() => {
+              item.marker.openPopup();
+            }, 1000);
+            searchResults.classList.remove('active');
+            searchInput.value = `${item.title} (${item.machineId})`;
+          });
+
+          searchResults.appendChild(div);
+        });
+      }
+
+      searchResults.classList.add('active');
+    });
+
+    // Close search dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+        searchResults.classList.remove('active');
+      }
+    });
+
+
+/**
+ * Helper to create a navigation pin with hover text and page redirect
+ * @param {number} y - Pixel Y coordinate
+ * @param {number} x - Pixel X coordinate
+ * @param {string} labelText - Text to show on hover (tooltip)
+ * @param {string} targetHtmlUrl - Path to the destination .html file
+ */
+function addNavigationPin(y, x, labelText, targetHtmlUrl) {
+  // 1. Create a custom map pin icon using an emoji or custom HTML
+  const navIcon = L.divIcon({
+    className: 'nav-pin',
+    html: `
+      <div style="
+        font-size: 1.8rem;
+        cursor: pointer;
+        filter: drop-shadow(0 12px 4px rgba(0,0,0,200));
+        transition: transform 0.2s;
+      ">[📍]</div>
+    `,
+    iconSize: [30, 30],
+    iconAnchor: [15, 30] // Point of the pin anchored to coordinates
+  });
+
+  // 2. Add marker to the map
+  const marker = L.marker([y, x], { icon: navIcon }).addTo(map);
+
+  // 3. Bind hover tooltip text
+  marker.bindTooltip(labelText, {
+    permanent: false, // Only show on hover
+    direction: 'top', // Position text above the pin
+    offset: [0, -28],
+    className: 'custom-hover-tooltip'
+  });
+
+  // 4. Redirect to the target HTML file when clicked
+  marker.on('click', function() {
+    window.location.href = targetHtmlUrl;
+  });
+}
+
+// --- NAVIGATION PINS ---// addNavigationPin(Y, X, "Hover Text Label", "destination_page.html");
+addNavigationPin(1503, 1306, "Go to AM Sensors", "SENSORS.html");
+addNavigationPin(1389, 2798, "Go to AM Sensors", "SENSORS.html");
+addNavigationPin(10, 1862, "Go to offices", "OFFICES.html");
+addNavigationPin(747, 19, "Go to Coils dept.", "COILS.html");
+addNavigationPin(554, 4143, "Go to Temp. Sensors.", "CTS.html");
+
+
+    // 5. Place POI pins across your factory blueprint [Y, X coordinates]
+    // Signature: addFactoryPin(y, x, title, machineId, badgeText, isOnline, description, photoUrl)
+
+    // ABS  ///////////////////////////////////////////////////////////////////////////
+    addFactoryPin(
+      520, 3063, 
+      "FADAL MILLING", "ICAY08",
+      "Operational", true,
+      "Fadal Vmc5 3-axis automated milling center.",
+      "CRANKS/ABS/ICAY08.png"
+    );
+
+    addFactoryPin(
+      573, 2620, 
+      "ERSA smartflow 2020", "CKAY03",
+      "Out of service", false,
+      "Ersa smartflow 2020 selective wave soldering machine & N2 generator system.",
+      "CRANKS/ABS/CKAY03.png"
+    );
+
+    addFactoryPin(
+      120, 2874, 
+      "Bracket press", "CKAY01",
+      "Operational", true,
+      "Automated Bracket press bench.",
+      "CRANKS/ABS/CKAY01.png"
+    );
+
+    addFactoryPin(
+      555, 2374,
+      "ABS Nittoku winder", "CKWND1",
+      "Operational", true,
+      "Nittoku winder 3-axis BOS-1451316.",
+      "CRANKS/ABS/CKWND1.png"
+    );
+
+    addFactoryPin(
+      381, 2973, 
+      "ABS Roll crimp", "SNAY06",
+      "Operational", true,
+      "Automated IAI roller crimp station.",
+      "CRANKS/ABS/SNAY06.png"
+    );
+
+    addFactoryPin(
+      116, 3059, 
+      "ABS FINAL TEST", "CKFT01",
+      "Partially Operational, Laser marking not working", true,
+      "ABS Wheel tester.",
+      "CRANKS/ABS/CKFT01.png"
+    );
+
+    addFactoryPin(
+      692, 2946, 
+      "KISS SOLDERING", "CKAY04",
+      "Operational", true,
+      "KISS wave soldering pot & N2 generator system",
+      "CRANKS/ABS/CKAY04.png"
+    );
+
+    addFactoryPin(
+      506, 2896, 
+      "ABS sub-assy test", "CKAY05",
+      "Operational", true,
+      "Resistance & inductance tester, termnal bending press.",
+      "CRANKS/ABS/CKAY05.png"
+    );
+
+    addFactoryPin(
+      525, 2502, 
+      "Tape application", "CKSLD2",
+      "Operational", true,
+      "Assembly table",
+      "CRANKS/ABS/CKSLD2.png"
+    );
+
+    addFactoryPin(
+      122, 2673, 
+      "CKAY20", "CKAY20",
+      "PCB Auto-trim", true,
+      "Automated PCB substrate trimmer",
+      "CRANKS/ABS/CKAY20.png"
+    );
+
+    addFactoryPin(
+      112, 3198, 
+      "Sonitek ABS", "CKAY06",
+      "Operational", true,
+      "Sonitek thermal stake press",
+      "CRANKS/ABS/CKAY06.png"
+    );
+    // ABS  ///////////////////////////////////////////////////////////////////////////
+
+    // BMR  ///////////////////////////////////////////////////////////////////////////
+    addFactoryPin(
+      757, 1503, 
+      "BMR & VR line", "CKAY14",
+      "Operational", true,
+      "Blow motor resistor & voltage regulator assembly line: Automated robot Tester with conveyor system",
+      "CRANKS/BMR/CKAY14-FRONT.png"
+    );
+    addFactoryPin(
+      624, 1534, 
+      "BMR & VR line", "CKAY14",
+      "Operational", true,
+      "Blow motor resistor & voltage regulator assembly line: orbital riveter & automated RTV dispensing system",
+      "CRANKS/BMR/CKAY14-BACK.png"
+    );
+    // BMR  ///////////////////////////////////////////////////////////////////////////
+
+    // HALL SNSR  ///////////////////////////////////////////////////////////////////////////
+    addFactoryPin(
+      1209, 1624, 
+      "Hall sensor line", "CKAY12",
+      "Operational", true,
+      "Flux dispenser, Reflow soldering & Epoxy dispensing Automated stations",
+      "CRANKS/HALL_SNSRS/CKAY12_AUTO.png"
+    );
+    addFactoryPin(
+      1281, 1774, 
+      "Assembly inspection", "CKAY12",
+      "Operational", true,
+      "Hall sensors Inspection station",
+      "CRANKS/HALL_SNSRS/CKAY12_INSP.png"
+    );
+    addFactoryPin(
+      1355, 1488, 
+      "Hall sensor Oven", "CKAY12",
+      "Operational", true,
+      "Cure oven , press & cooling fan stations",
+      "CRANKS/HALL_SNSRS/CKAY12_OVEN.png"
+    );
+    addFactoryPin(
+      1166, 1244, 
+      "Hall sensor Tester", "CKAY12",
+      "Operational", true,
+      "Automated wheel Test & leak test station with laser marker, conveyor system and inspection table",
+      "CRANKS/HALL_SNSRS/CKAY12_TEST.png"
+    );
+    addFactoryPin(
+      1120, 1705, 
+      "Hall sensor cshaft line", "CKAY12",
+      "Operational", true,
+      "Hall effect cam/crank shaft sensors",
+      "CRANKS/HALL_SNSRS/CKAY12_FRONT.png"
+    );
+    // HALLESDFS  ///////////////////////////////////////////////////////////////////////////
+
+    // ROLLER  ///////////////////////////////////////////////////////////////////////////
+    addFactoryPin(
+      821, 1098, 
+      "CKAY16", "CKAY16",
+      "Roll crimp station line", true,
+      "Roll crimping workstation, bracket press & Robot wheel tester",
+      "CRANKS/ROLL_STATION/CKAY16.png"
+    );
+    // ROLLER  ///////////////////////////////////////////////////////////////////////////
+
+    // MOLDMAN  ///////////////////////////////////////////////////////////////////////////
+    addFactoryPin(
+      1332, 4009, 
+      "MOLDMAN line", "CKAY15",
+      "Operational", true,
+      "Low pressure molding, Polyamide overmolded Electronics",
+      "CRANKS/MOLDMAN/CKAY15.png"
+    );
+    addFactoryPin(
+      1334, 4275, 
+      "Auto-start line", "CKAY15",
+      "Operational (paste IAI out of service)", true,
+      "Automated assembly line, conveyor system, IAI terminal bending, IAI solder paste dispenser & Denso robot iron soldering",
+      "CRANKS/MOLDMAN/CKAY15-AUTO.png"
+    );
+    addFactoryPin(
+      1213, 4101, 
+      "MoldMan 8200", "CKAY15",
+      "Operational", true,
+      "Low pressure molding press",
+      "CRANKS/MOLDMAN/CKAY15-MOLDMAN.png"
+    );
+    addFactoryPin(
+      1174, 3919, 
+      "Dial Tester", "CKAY15",
+      "Operational", true,
+      "Dial 8 pos. Electrical resistance & voltage output tester with ink marker",
+      "CRANKS/MOLDMAN/CKAY15-TESTER1.png"
+    );
+    addFactoryPin(
+      1458, 3924, 
+      "Wheel tester", "CKAY15",
+      "Operational", true,
+      "Voltage peak Wheel tester & Thermo electrical Oven",
+      "CRANKS/MOLDMAN/CKAY15-TESTER2.png"
+    );
+    addFactoryPin(
+      887, 4280, 
+      "ABS magnetizer", "CKAY09",
+      "Operational", true,
+      "ABS Magnetizer",
+      "CRANKS/MOLDMAN/CKAY09.png"
+    );
+    // MOLDMAN  ///////////////////////////////////////////////////////////////////////////
+
+    // POTTING  ///////////////////////////////////////////////////////////////////////////
+    addFactoryPin(
+      1291, 423, 
+      "Robot tester", "CKAY19",
+      "Operational", true,
+      "Automated robot wheel tester with laser marking",
+      "CRANKS/POTTING/CKAY19-TESTER1.png"
+    );
+    addFactoryPin(
+      1332, 153, 
+      "CKAY19", "CKAY19",
+      "Harness tester", true,
+      "Harness wire sensors Fixed wheel tester with laser marking",
+      "CRANKS/POTTING/CKAY19-TESTER2.png"
+    );
+    addFactoryPin(
+      1351, 274, 
+      "Pickup tester", "CKAY19",
+      "Operational", true,
+      "Pick-up sensors tester",
+      "CRANKS/POTTING/CKAY19-TESTER3.png"
+    );
+    addFactoryPin(
+      1119, 208, 
+      "Soldering station", "CKSLD3",
+      "Operational", true,
+      "PCB-Harness Soldering station",
+      "CRANKS/POTTING/CKSLD3.png"
+    );
+    addFactoryPin(
+      873, 523, 
+      "1st disp", "CKAY19",
+      "Operational", true,
+      "1st automated epoxy dispensing",
+      "CRANKS/POTTING/CKAY19-DISP1.png"
+    );
+    addFactoryPin(
+      336, 521, 
+      "2nd Disp", "CKAY19",
+      "Operational", true,
+      "2nd automated epoxy dispensing",
+      "CRANKS/POTTING/CKAY19-DISP2.png"
+    );
+    addFactoryPin(
+      587, 867, 
+      "Magnet pole press", "CKAY21",
+      "Operational", true,
+      "Magnet pole former press",
+      "CRANKS/POTTING/CKAY21.png"
+    );
+    addFactoryPin(
+      584, 965, 
+      "Magnetizer press", "CKAY07",
+      "Operational", true,
+      "Sensor Magnetizer with chiller & press",
+      "CRANKS/POTTING/CKAY07.png"
+    );
+    addFactoryPin(
+      582, 1149, 
+      "SU4015 assembly table", "CKAY19",
+      "Operational", true,
+      "SU4015 speed sensor assembly includes a press and a dispensing valve system",
+      "CRANKS/POTTING/CKAY19-SU4015.png"
+    );
+    // POTTING  ///////////////////////////////////////////////////////////////////////////
+
+    // DEK  ///////////////////////////////////////////////////////////////////////////
+    addFactoryPin(
+      766, 280, 
+      "DEK printer", "CKAY11",
+      "Operational", true,
+      "DEK substrate solder paste printer with automated feeder system",
+      "CRANKS/DEK/CKAY11-DEK.png"
+    );
+    addFactoryPin(
+      445, 255, 
+      "DEK Oven", "CKAY11",
+      "Operational", true,
+      "Vitronics XPM2 Furnace system & N2 generator",
+      "CRANKS/DEK/CKAY11-OVEN.png"
+    );
+    addFactoryPin(
+      191, 228, 
+      "Dek inspection", "CKAY11",
+      "Operational", true,
+      "OVEN exit, assembly & inspection table",
+      "CRANKS/DEK/CKAY11-end.png"
+    );
+    addFactoryPin(
+      262, 68, 
+      "UV encapsulant", "CKAY11",
+      "Operational", true,
+      "Automated glue dispensing system with UV lamp",
+      "CRANKS/DEK/CKAY11-UV.png"
+    );
+    // DEK  ///////////////////////////////////////////////////////////////////////////
+
+    // hawkeye  ///////////////////////////////////////////////////////////////////////////
+    addFactoryPin(
+      257, 1616, 
+      "TECH SENSORS", "SNPKG4",
+      "Operational", true,
+      "AM Packaging Line",
+      "CRANKS/HAWKEYE.png"
+    );
+    // hawkeye  ///////////////////////////////////////////////////////////////////////////
+
+  </script>
+</body>
+</html>

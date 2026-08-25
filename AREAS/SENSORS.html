@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Niterra Layout Interactivo</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body, html { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+    #factory-map {
+      width: 100vw;
+      height: 100vh;
+      background-color: #0f172a;
+    }
+
+    /* Customizing Leaflet Popups to look like Google Maps cards */
+    .leaflet-popup-content-wrapper {
+      background: #1e293b;
+      color: #f8fafc;
+      border-radius: 12px;
+      padding: 0;
+      overflow: hidden;
+      border: 1px solid #334155;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+    .leaflet-popup-content {
+      margin: 0 !important;
+      width: 500px !important;
+    }
+    .leaflet-popup-tip {
+      background: #1e293b;
+    }
+    
+    .popup-card a {
+      display: block;
+      text-decoration: none;
+    }
+    .popup-card img {
+      width: 100%;
+      height: 300px;
+      object-fit: contain;
+      display: block;
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+    .popup-card img:hover {
+      opacity: 0.85;
+    }
+    .popup-info {
+      padding: 12px 16px 16px;
+    }
+
+    /* Badges Row */
+    .popup-badge-group {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    .popup-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+    .badge-online { background: #059669; color: #ecfdf5; }
+    .badge-maint { background: #d97706; color: #fffbeb; }
+    .badge-id { background: #0284c7; color: #ffffff; }
+    .badge-coords { background: #334155; color: #38bdf8; border: 1px solid #475569; font-family: monospace; }
+
+    .popup-title { font-size: 1rem; font-weight: 600; margin-bottom: 4px; color: #f1f5f9; }
+    .popup-desc { font-size: 0.8rem; color: #94a3b8; line-height: 1.4; }
+
+/* Custom dark tooltip on hover */
+.custom-hover-tooltip {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+  border: 1px solid #38bdf8 !important;
+  border-radius: 6px !important;
+  font-weight: 600 !important;
+  font-size: 0.85rem !important;
+  padding: 6px 10px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Tooltip arrow color styling */
+.custom-hover-tooltip::before {
+  border-top-color: #38bdf8 !important;
+}
+    /* Custom Header Banner */
+    .map-header {
+      position: absolute;
+      top: 16px;
+      left: 60px;
+      z-index: 1000;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid #334155;
+      backdrop-filter: blur(8px);
+      padding: 10px 18px;
+      border-radius: 8px;
+      color: white;
+    }
+    .map-header h1 { font-size: 1rem; font-weight: 600; }
+    .map-header p { font-size: 0.75rem; color: #94a3b8; }
+
+    /* Search Box Styles */
+    .search-container {
+      position: absolute;
+      top: 25px;
+      left: 320px;
+      z-index: 1000;
+      width: 300px;
+    }
+    .search-input {
+      width: 100%;
+      height: 40px;
+      padding: 0 14px 0 36px;
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: #f8fafc;
+      font-size: 0.85rem;
+      backdrop-filter: blur(8px);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .search-input:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+    }
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 20px;
+      transform: translateY(-50%);
+      color: #94a3b8;
+      font-size: 0.85rem;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .search-results {
+      position: absolute;
+      top: 46px;
+      left: 0;
+      right: 0;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      max-height: 250px;
+      overflow-y: auto;
+      display: none;
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5);
+      z-index: 1001;
+    }
+    .search-results.active { display: block; }
+    .search-item {
+      padding: 10px 14px;
+      cursor: pointer;
+      color: #f8fafc;
+      font-size: 0.85rem;
+      border-bottom: 1px solid #334155;
+      transition: background 0.15s;
+    }
+    .search-item:last-child { border-bottom: none; }
+    .search-item:hover { background: #0284c7; }
+    .search-item-sub { display: block; font-size: 0.75rem; color: #94a3b8; margin-top: 2px; }
+    .search-item:hover .search-item-sub { color: #e0f2fe; }
+
+    /* Live Cursor Coordinate Tracker Box */
+    .coord-tracker {
+      position: absolute; bottom: 20px; left: 20px; z-index: 1000;
+      background: rgba(15, 23, 42, 0.85); color: #f8fafc;
+      border: 1px solid #334155; backdrop-filter: blur(8px);
+      padding: 8px 14px; border-radius: 8px; font-family: monospace;
+      font-size: 0.85rem; pointer-events: none; box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      display: flex; gap: 12px; align-items: center;
+    }
+    .coord-value { color: #38bdf8; font-weight: 700; }
+
+  </style>
+</head>
+<body>
+
+  <div class="map-header">
+    <h1>Niterra planta Reynosa</h1>
+    <p>Sensors & Wire-sets </p>
+  </div>
+
+  <div style="position: absolute; top: 80px; left: 60px; z-index: 1000;">
+    <a href="../index.html" style="
+      background: #1e293b; color: #38bdf8; text-decoration: none; 
+      padding: 10px 16px; border-radius: 8px; border: 1px solid #334155;
+      font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+      ← Back to Layout Index
+    </a>
+  </div>
+
+  <!-- Search Component -->
+  <div class="search-container">
+    <span class="search-icon">🔍</span>
+    <input type="text" id="search-input" class="search-input" placeholder="Search station, machine ID, or description..." autocomplete="off">
+    <div id="search-results" class="search-results"></div>
+  </div>
+
+  <div id="factory-map"></div>
+
+  <!-- Coordinate Display Panel -->
+  <div class="coord-tracker" id="coord-tracker">
+    <span>X: <span class="coord-value" id="coord-x">0</span> px</span>
+    <span>Y: <span class="coord-value" id="coord-y">0</span> px</span>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    // Master registry array for search filtering
+    const markersList = [];
+
+    // 1. Initialize Leaflet map with Flat Pixel Coordinate System (CRS.Simple)
+    const map = L.map('factory-map', {
+      crs: L.CRS.Simple,
+      minZoom: -2,
+      maxZoom: 2,
+      zoomControl: true
+    });
+
+    // 2. Define map bounds (Width x Height in pixels of your blueprint image)
+    const imgWidth = 4055;
+    const imgHeight = 3081;
+
+    const bounds = [[0, 0], [imgHeight, imgWidth]];
+
+    // 3. Add floor plan image overlay
+    const imageUrl = "SENSORS/layout-SENSORS.png";
+    L.imageOverlay(imageUrl, bounds).addTo(map);
+
+    const centerPoint = [imgHeight / 2, imgWidth / 2];
+
+    // Center map directly on the middle pixel
+    map.setView(centerPoint, -1);
+
+    // Force Leaflet to recalculate map dimensions and center
+    setTimeout(() => {
+      map.invalidateSize();
+      map.fitBounds(bounds);
+    }, 100);
+
+    // 4. Helper function to create Google-Maps-style marker pins
+    function addFactoryPin(y, x, title, machineId, badgeText, isOnline, description, photoUrl) {
+      const customIcon = L.divIcon({
+        className: 'custom-pin',
+        html: `
+          <div style="
+            background: ${isOnline ? '#0284c7' : '#d97706'};
+            width: 32px; height: 32px; border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            display: flex; align-items: center; justify-content: center;
+            border: 2px solid #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            cursor: pointer;
+          ">
+            <div style="width: 10px; height: 10px; background: white; border-radius: 50%; transform: rotate(45deg);"></div>
+          </div>
+        `,
+        iconSize: [32, 32],
+        iconAnchor: [16, 32],
+        popupAnchor: [0, -32]
+      });
+
+      // Construct Popup HTML with ID, Coordinates Badges, and clickable image
+      const popupContent = `
+        <div class="popup-card">
+          <a href="${photoUrl}" target="_blank" rel="noopener noreferrer" title="Click to view full image in a new tab">
+            <img src="${photoUrl}" alt="${title}">
+          </a>
+          <div class="popup-info">
+            <div class="popup-badge-group">
+              <span class="popup-badge ${isOnline ? 'badge-online' : 'badge-maint'}">${badgeText}</span>
+              <span class="popup-badge badge-id">ID: ${machineId}</span>
+              <span class="popup-badge badge-coords">X: ${x} | Y: ${y}</span>
+            </div>
+            <div class="popup-title">${title}</div>
+            <div class="popup-desc">${description}</div>
+          </div>
+        </div>
+      `;
+
+      const marker = L.marker([y, x], { icon: customIcon })
+        .addTo(map)
+        .bindPopup(popupContent);
+
+      // Register pin data in master search array
+      markersList.push({
+        y, x, title, machineId, badgeText, description, photoUrl, marker
+      });
+    }
+
+    // --- CURSOR COORDINATE TRACKER LOGIC ---
+    const coordX = document.getElementById('coord-x');
+    const coordY = document.getElementById('coord-y');
+
+    map.on('mousemove', function (e) {
+      const x = Math.round(e.latlng.lng);
+      const y = Math.round(e.latlng.lat);
+
+      if (x >= 0 && x <= imgWidth && y >= 0 && y <= imgHeight) {
+        coordX.innerText = x;
+        coordY.innerText = y;
+      } else {
+        coordX.innerText = 'Out of bounds';
+        coordY.innerText = 'Out of bounds';
+      }
+    });
+
+    // --- SEARCH FUNCTIONALITY LOGIC ---
+    const searchInput = document.getElementById('search-input');
+    const searchResults = document.getElementById('search-results');
+
+    searchInput.addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase().trim();
+      searchResults.innerHTML = '';
+
+      if (query.length === 0) {
+        searchResults.classList.remove('active');
+        return;
+      }
+
+      // Filter pins matching Title, Machine ID, Description, or Badge Text
+      const filtered = markersList.filter(item => 
+        item.title.toLowerCase().includes(query) || 
+        item.machineId.toLowerCase().includes(query) ||
+        item.description.toLowerCase().includes(query) ||
+        item.badgeText.toLowerCase().includes(query)
+      );
+
+      if (filtered.length === 0) {
+        searchResults.innerHTML = `<div class="search-item" style="color:#94a3b8;">No matching locations found</div>`;
+      } else {
+        filtered.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'search-item';
+          div.innerHTML = `
+            <strong>${item.title}</strong> (ID: ${item.machineId})
+            <span class="search-item-sub">${item.description}</span>
+          `;
+          
+          div.addEventListener('click', () => {
+            map.flyTo([item.y, item.x], 0, { duration: 1 });
+            setTimeout(() => {
+              item.marker.openPopup();
+            }, 1000);
+            searchResults.classList.remove('active');
+            searchInput.value = `${item.title} (${item.machineId})`;
+          });
+
+          searchResults.appendChild(div);
+        });
+      }
+
+      searchResults.classList.add('active');
+    });
+
+    // Close search dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+        searchResults.classList.remove('active');
+      }
+    });
+
+
+
+
+/**
+ * Helper to create a navigation pin with hover text and page redirect
+ * @param {number} y - Pixel Y coordinate
+ * @param {number} x - Pixel X coordinate
+ * @param {string} labelText - Text to show on hover (tooltip)
+ * @param {string} targetHtmlUrl - Path to the destination .html file
+ */
+function addNavigationPin(y, x, labelText, targetHtmlUrl) {
+  // 1. Create a custom map pin icon using an emoji or custom HTML
+  const navIcon = L.divIcon({
+    className: 'nav-pin',
+    html: `
+      <div style="
+        font-size: 1.8rem;
+        cursor: pointer;
+        filter: drop-shadow(0 12px 4px rgba(0,0,0,200));
+        transition: transform 0.2s;
+      ">[📍]</div>
+    `,
+    iconSize: [30, 30],
+    iconAnchor: [15, 30] // Point of the pin anchored to coordinates
+  });
+
+  // 2. Add marker to the map
+  const marker = L.marker([y, x], { icon: navIcon }).addTo(map);
+
+  // 3. Bind hover tooltip text
+  marker.bindTooltip(labelText, {
+    permanent: false, // Only show on hover
+    direction: 'top', // Position text above the pin
+    offset: [0, -28],
+    className: 'custom-hover-tooltip'
+  });
+
+  // 4. Redirect to the target HTML file when clicked
+  marker.on('click', function() {
+    window.location.href = targetHtmlUrl;
+  });
+}
+
+// --- NAVIGATION PINS ---// addNavigationPin(Y, X, "Hover Text Label", "destination_page.html");
+addNavigationPin(283, 911, "Go to Cam&Crank sensors", "CRANKS.html");
+addNavigationPin(120, 2500, "Go to Cam&Crank sensors", "CRANKS.html");
+addNavigationPin(2822, 3003, "Go to KNS JAPAN", "KNS.html");
+addNavigationPin(1496, 64, "Go to COILS dept.", "COILS.html");
+
+
+
+    // 5. Place POI pins across your factory blueprint [Y, X coordinates]
+    // Signature: addFactoryPin(y, x, title, machineId, badgeText, isOnline, description, photoUrl)
+
+    // VVT'S DEP 1173 //////////////////////////////////////////////////////////////////
+    addFactoryPin(2921, 730, "?????", "SNAY01", "Operational", true, "?????", "SENSORS/VVT/SNAY01.png");
+    addFactoryPin(2691, 530, "?????", "SNAY02", "Operational", true, "?????", "SENSORS/VVT/SNAY02.png");
+    addFactoryPin(2691, 700, "?????", "SNAY03", "Operational", true, "?????", "SENSORS/VVT/SNAY03.png");
+
+    // PV'S DEP 1173 ///////////////////////////////////////////////////////////////////
+    addFactoryPin(2201, 305, "SERA ROLL CRIMP", "SNAY04", "Operational", true, "Automated Roll crimping machine PVs", "SENSORS/PV/SNAY04_WCT4123.png");
+    addFactoryPin(2201, 425, "FINAL TEST", "SNAY04", "Operational", true, "Final EVAP electrical & leak test, laser marking", "SENSORS/PV/SNAY04_TEST.png");
+    addFactoryPin(2201, 897, "CINCINNATI", "SNAY04", "Operational", true, "EVAP PRESSURE LEAK TEST", "SENSORS/PV/SNAY04_CINCINNATI.png");
+    addFactoryPin(2201, 620, "FUNCTION TEST", "SNAY04", "Operational", true, "Functionality test", "SENSORS/PV/SNAY04_PRUEBA.png");
+    addFactoryPin(2201, 780, "TUBING ASSEMBLY", "SNAY04", "Operational", true, "Automated Assembly with fixtures, pneumatic cylinder actuators", "SENSORS/PV/SNAY04_TUBING.png");
+    addFactoryPin(2201, 960, "EMERSON ULTRASONIC", "SNAY04", "Operational", true, "Emerson ultrasonic welder", "SENSORS/PV/SNAY04_EMERSON.png");
+    addFactoryPin(2201, 1110, "DUKANE ULTRASONIC", "SNAY04", "Operational", true, "Dukane ultrasonic welder", "SENSORS/PV/SNAY04_DUKANE.png");
+    addFactoryPin(2201, 1217, "PV COMP. ASSY.", "SNAY04", "Operational", true, "Pneumatic assembly press", "SENSORS/PV/SNAY04_WCT1684.png");
+    addFactoryPin(2201, 1296, "WELDING", "SNAY04", "Operational", true, "Resistance welder", "SENSORS/PV/SNAY04_WELD.png");
+    addFactoryPin(2201, 1410, "COMP. ASSY. PVs", "SNAY04", "Operational", true, "Assembly pneumatic press", "SENSORS/PV/SNAY04_WCT1605.png");
+    addFactoryPin(2201, 1479, "COMP. ASSY. PVs", "SNAY04", "Operational", true, "Assembly pneumatic press", "SENSORS/PV/SNAY04_WCT1665.png");
+    addFactoryPin(2201, 1560, "COMP. ASSY. PVs", "SNAY04", "Operational", true, "TOX PRESSOTECHNIK", "SENSORS/PV/SNAY04_WCT1606.png");
+    addFactoryPin(2201, 1640, "Hutchinson Press", "SNAY04", "Operational", true, "TOX PRESSOTECHNIK Crimping press", "SENSORS/PV/SNAY04_WCT1370.png");
+
+// PEDALES 1173 //////////////////////////////////////////////////////////////////
+    
+    addFactoryPin(1935, 1592, "SONITEK PEDAL", "SNAY05", "Operational", true, "Sonitek S10 heat stake machine automated thermal press", "SENSORS/PEDAL/SNAY05_SONITEK.jpg");
+    addFactoryPin(1935, 1515, "SOLDERING STATION", "SNAY05", "Operational", true, "Assembly table for manual soldering operation", "SENSORS/PEDAL/SNAY05_SOLDERING.jpg");
+    addFactoryPin(1935, 1404, "SONITEK 2", "SNAY03", "Operational", true, "Sonitek S10 heat stake machine automated thermal press", "SENSORS/PEDAL/SNAY05_SONITEK.jpg");
+    addFactoryPin(1935, 1287, "ULTRASONIC WELDING", "SNAY05", "Operational", true, "Dukane iQservo for ultrasonic weld operation", "SENSORS/PEDAL/SNAY05_DUKANE.jpg");
+    addFactoryPin(1935, 1032, "PEDAL SPRING ASSY.", "SNAY05", "Operational", true, "2 pneumatic cylinders for spring & bracket insertion", "SENSORS/PEDAL/SNAY05 _SUBASSY.jpg");
+    addFactoryPin(1935, 885, "MODULE TEST", "SNAY05", "Operational", true, "Pedal ACC. POS SENSOR Module subassembly tester machine", "SENSORS/PEDAL/SNAY05_TEST.jpg");
+    addFactoryPin(1935, 740, "PEDAL RIVETING", "SNAY05", "Operational", true, "Orbital riveter ORBITFORM B-750", "SENSORS/PEDAL/SNAY05_ORBITFORM750.jpg");
+    addFactoryPin(1935, 635, "ORBITAL RIVETER", "SNAY05", "Operational", true, "Orbital riveter ORBITFORM B-310", "SENSORS/PEDAL/SNAY05_ORBITFORM310.jpg");
+    addFactoryPin(1935, 465, "FINAL TEST", "SNAY05", "Operational", true, "Automated electrical performance test with Laser marking system", "SENSORS/PEDAL/SNAY05_FINALTEST.jpg");
+
+// IAC'S DEP 1173 //////////////////////////////////////////////////////////////////
+    addFactoryPin(1951, 1090, "?????", "SWAY03", "Operational", true, "?????", "SENSORS/IAC/SWAY03.png");
+    addFactoryPin(1951, 1250, "?????", "SWAY04", "Operational", true, "?????", "SENSORS/IAC/SWAY04.png");
+
+    // EGR DEP 1173 //////////////////////////////////////////////////////////////////--
+    addFactoryPin(1401, 520, "?????", "SWAY05", "Operational", true, "?????", "SENSORS/EGR/SWAY05.png");
+    addFactoryPin(1401, 730, "?????", "SWAY06", "Operational", true, "?????", "SENSORS/EGR/SWAY06.png");
+    addFactoryPin(1401, 930, "?????", "SWAY07", "Operational", true, "?????", "SENSORS/EGR/SWAY07.png");
+    addFactoryPin(1401, 1120, "?????", "SWAY08", "Operational", true, "?????", "SENSORS/EGR/SWAY08.png");
+    addFactoryPin(1401, 1350, "?????", "SWAY09", "Operational", true, "?????", "SENSORS/EGR/SWAY09.png");
+
+    // SUB ASSY'S & ORCA DEP 1173 //////////////////////////////////////////////////////
+    addFactoryPin(1131, 1150, "?????", "SLD01", "Operational", true, "?????", "SENSORS/SUBASSY/SLD01.png");
+    addFactoryPin(1131, 1550, "?????", "SNAY20", "Operational", true, "?????", "SENSORS/SUBASSY/SNAY20.png");
+    addFactoryPin(581, 480, "?????", "SLD02", "Operational", true, "?????", "SENSORS/SUBASSY/SLD02.png");
+    addFactoryPin(581, 1100, "?????", "SLD03", "Operational", true, "?????", "SENSORS/SUBASSY/SLD03.png");
+    addFactoryPin(581, 1250, "?????", "SLD04", "Operational", true, "?????", "SENSORS/SUBASSY/SLD04.png");
+
+    // WIRESETS & ASSEMBLY LINES (RIGHT SIDE) /////////////////////////////////////////
+    addFactoryPin(1926, 3133, "SHRINK TUBING", "WSAY01", "Operational", true, "Heat shrink thermocontract CYL. NO. TO S", "SENSORS/WIRESETS/WSAY01.png");
+    addFactoryPin(2161, 2434, "Terminal Seal", "WSAY03", "Operational", true, "Terminal seal glue bench assembly station", "SENSORS/WIRESETS/WSAY02.png");
+    addFactoryPin(1486, 3122, "WIRE STRIP/TRIM", "WSAY03", "Operational", true, "ASM-3001 WIRE STRIPPER", "SENSORS/WIRESETS/WSAY03.png");
+    addFactoryPin(1940, 2391, "Terminal Pin Assembly", "WSAY04", "Operational", true, "Insert terminal pin to SP. W. & continuity test", "SENSORS/WIRESETS/WSAY04.png");
+    addFactoryPin(1940, 2541, "TUBBING ASSEMBLY", "WSAY05", "Operational", true, "TERMINAL PRESS KENCO 055", "SENSORS/WIRESETS/WSAY05.png");
+    addFactoryPin(1940, 2649, "BOOT ASSEMBLY 5MM", "WSAY06", "Operational", true, "Assembly table 5MM NGK", "SENSORS/WIRESETS/WSAY06.png");
+	addFactoryPin(1940, 2882, "BOOT ASSEMBLY 5MM", "WSAY06", "Operational", true, "Assembly table 5MM NGK", "SENSORS/WIRESETS/WSAY06.png");
+    addFactoryPin(1940, 2775, "Component Assembly", "WSAY07", "Operational", true, "ASSEMBLY COMPONENTS, TERMINAL BENDING HAND TERMINATOR 062/063", "SENSORS/WIRESETS/WSAY07.png");
+    addFactoryPin(1937, 3006, "ASSEMBLY BOOT TABLE", "WSAY08", "Operational", true, "Regular table with hand tooling", "SENSORS/WIRESETS/WSAY08.png");
+    addFactoryPin(1937, 3715, "FINAL INSPECTION", "WSAY09", "Operational", true, "Final inspection table N", "SENSORS/WIRESETS/WSAY09.png");
+    addFactoryPin(2164, 2512, "BENDER PRESS", "WSAY10", "Operational", true, "Pneumatic cylinder", "SENSORS/WIRESETS/WSAY10.png");
+    addFactoryPin(1249, 2994, "BOOTING GRIP", "WSAY11", "Operational", true, "Booting Assembly griper 26 stations", "SENSORS/WIRESETS/WSAY11.png");
+    addFactoryPin(1246, 3434, "PACKAGING", "WSAY12", "Operational", true, "5 STATIONS FOR ASSY & PACK", "SENSORS/WIRESETS/WSAY12.png");
+    addFactoryPin(1230, 2510, "SPIRAL STATION ASSEMBLY", "WSAY13", "Operational", true, "SPIRAL STATION ASSEMBLY", "SENSORS/WIRESETS/WSAY13.png");
+    addFactoryPin(2156, 2586, "HEATSHRINK CYL NO. TO SP", "WSAY14", "Operational", true, "HEATSHRINK CYL NO. TO SP", "SENSORS/WIRESETS/WSAY14.png");
+    addFactoryPin(2156, 2728, "INSERT TERM PINS TO SP W", "WSAY15", "Operational", true, "INSERT TERM PINS TO SP W", "SENSORS/WIRESETS/WSAY15.png");
+    addFactoryPin(2146, 2794, "Terminal crimp", "WSAY16", "Operational", true, "HAND TERMINATOR  091/092", "SENSORS/WIRESETS/WSAY16.png");
+	addFactoryPin(2141, 3701, "BOOT ASSY", "WSAY17", "Operational", true, "BOOT ASSEMBLY TABLE NGK", "SENSORS/WIRESETS/WSAY17.png");
+	addFactoryPin(2147, 2917, "Terminal press", "WSAY18", "Operational", true, "TERM. PRESS KENCO 126", "SENSORS/WIRESETS/WSAY18.png");
+	addFactoryPin(2145, 3262, "BOOT ASSEMBLY", "WSAY19", "Operational", true, "Pneumatic Press", "SENSORS/WIRESETS/WSAY19.png");
+	addFactoryPin(1249, 3159, "CONECTOR ASSEMBLY", "WSAY20", "Operational", true, "Assembly table", "SENSORS/WIRESETS/WSAY20.png");
+	addFactoryPin(2148, 3458, "NIPPLE ASSEMBLY", "WSAY21", "Operational", true, "2- PNEUMATIC CYL.", "SENSORS/WIRESETS/WSAY21.png");
+	addFactoryPin(2411, 2760, "Crimp.", "WSAY22", "Operational", true, "ASSY COMPONENTES, CRIMP TERMINALS ", "SENSORS/WIRESETS/WSAY22.png");
+	addFactoryPin(1256, 2814, "Crimp", "WSAY23", "Operational", true, "Crimping press", "SENSORS/WIRESETS/WSAY23.png");
+	addFactoryPin(1926, 3215, "WIRE SHEATH CUT", "WSAY24", "Operational", true, "Automated trimer", "SENSORS/WIRESETS/WSAY24.png");
+    addFactoryPin(1935, 3311, "Resistance test", "WSFT01", "Operational", true, "Resistance test table with HMI and probe", "SENSORS/WIRESETS/WSFT01.png");
+    addFactoryPin(1921, 3501, "LASER MARKER", "WSFT02", "Operational", true, "Wire bench & Keyence 3-Axis Laser marker", "SENSORS/WIRESETS/WSFT02.png");
+    addFactoryPin(2142, 3818, "Final Packaging", "WSPKG01", "Operational", true, "Decorative box & shipping packaging", "SENSORS/WIRESETS/WSPKG01.png");
+
+
+	///////TPS /////////////////////////////////////////////////////////////////
+    addFactoryPin(744, 3834, "HEAT STAKE TPS", "SNAY12", "Operational", true, "Sonitek Heat stake machine press", "SENSORS/TPS/SNAY12_SONITEK.jpg");
+    addFactoryPin(744, 3709, "ASSEMBLY TABLE", "SNAY12", "Operational", true, "Component Assembly table with pneumatic press", "SENSORS/TPS/SNAY12_ASSY.jpg");
+    addFactoryPin(744, 3609, "Assembly Press", "SNAY12", "Operational", true, "pneumatic press", "SENSORS/TPS/SNAY12_PRESS.jpg");
+    addFactoryPin(744, 3509, "HSG ASSEMBLY", "SNAY12", "Operational", true, "Assembly table", "SENSORS/TPS/SNAY12_WC6563.jpg");
+    addFactoryPin(744, 3409, "TPS FINAL TEST", "SNAY12", "Operational", true, "SPINNING MOTOR POSITION TESTER & Keyence Laser marking", "SENSORS/TPS/SNAY12_TESTER.jpg");
+    addFactoryPin(744, 3259, "TPS Ultrasonic weld", "SNUW1", "Operational", true, "DUKANE 410 Ultrasonic welder", "SENSORS/TPS/SNUW1.jpg");
+
+    addFactoryPin(624, 3509, "TPS149 ASSY.", "SNAY25", "Operational", true, "FORD/TPS149 Automated Assembly", "SENSORS/TPS/SNAY25.jpg");
+    addFactoryPin(624, 3579, "TERMINAL EXPANSION", "SNAY11", "Operational", true, "TOX PRESSOTECHNIK EXPANSION DIE", "SENSORS/TPS/SNAY11.jpg");
+
+  addFactoryPin(429, 2680, "RIVETER", "SNAY12", "Operational", true, "TAUMEL ORBITAL RIVETER", "SENSORS/TPS/SNAY12_TAUMEL.jpg");
+	///////TPS /////////////////////////////////////////////////////////////////
+
+	///////KNS AFTERMARKET/////////////////////////////////////////////////////////////////
+    addFactoryPin(701, 2500, "GLUE DISPENSE", "SNAY24", "Operational", true, "Automated conveyor system, glue dispense pumps & cure oven", "SENSORS/KNS-AM/SNAY24.png");
+    addFactoryPin(686, 3081, "DISPENSE AUDIT", "SNAY20", "Operational", true, "Syringe & precision weight scale", "SENSORS/KNS-AM/SNAY20_WC6296.png");
+    addFactoryPin(579, 3215, "WELDER", "SNAY20", "Operational", true, "KNOCK SENSOR resistance welder Miyachi Unitek ISA-500CR", "SENSORS/KNS-AM/SNAY20_WELDER.png");
+    addFactoryPin(519, 2753, "KNS HSG. ASSY.", "SNAY18", "Operational", true, "Denison MULTIPRESS Mechanical press", "SENSORS/KNS-AM/SNAY18.png");
+    addFactoryPin(441, 2580, "TERMINAL WELDER", "SNAY19", "Operational", true, "Dual cyl. head Miyachi 250 DUAL PULSE Unitek Welder", "SENSORS/KNS-AM/SNAY19.png");
+    addFactoryPin(456, 2426, "KNS ASSEMBLY STATION", "SNAY15", "Operational", true, "Assembly station, automatic screwdriver & resistance tester", "SENSORS/KNS-AM/SNAY15_ASSY.png");
+    addFactoryPin(466, 2266, "FLAT WELDER", "SNAY15", "Operational", true, "FLAT RESPONSE SENSOR WELDER AMADA Miyachi automated resistance welder", "SENSORS/KNS-AM/SNAY15_WELDER.png");
+    addFactoryPin(1094, 2828, "KNS WELDER", "SNAY16", "Operational", true, "Miyachi Unitek ISA-1000CR", "SENSORS/KNS-AM/SNAY16.png");
+    addFactoryPin(1050, 3555, "OVEN", "SNAY26", "Operational", true, "High temperature cure oven", "SENSORS/KNS-AM/SNAY26.png");
+
+    addFactoryPin(1052, 2696, "KNS FINAL TEST", "SNFT01", "Operational", true, "Pin stamper KNS final performance tester with keyence 3-Axis laser marking", "SENSORS/KNS-AM/SNFT01.png");
+    addFactoryPin(1054, 2578, "PACKAGING STATION", "SNPKG2", "Operational", true, "Assembly table for KNS-AM packaging operation", "SENSORS/KNS-AM/SNPKG2.png");
+    addFactoryPin(1074, 2468, "KNS FLAT TEST", "SNFT02", "Operational", true, "Knock sensor flat response final tester & laser marking", "SENSORS/KNS-AM/SNFT02.png");
+
+	///////KNS AFTERMARKET/////////////////////////////////////////////////////////////////
+
+  </script>
+</body>
+</html>
