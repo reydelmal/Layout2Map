@@ -153,7 +153,7 @@
     });
 
     // Main floor plan backdrop
-    L.imageOverlay('AREAS/Layout-lowres.png', bounds).addTo(map);
+    L.imageOverlay('AREAS/layout-lowres.png', bounds).addTo(map);
     map.fitBounds(bounds);
 
     // --- CURSOR COORDINATE TRACKER LOGIC ---
@@ -173,7 +173,10 @@
       }
     });
 
-  /**
+// Variable to store the active hover shape layer
+let currentHoverPolygon = null;
+
+/**
  * Helper to add clickable markers on the main map with hover highlighting
  * @param {number} y - Pixel Y location
  * @param {number} x - Pixel X location
@@ -229,6 +232,7 @@ function addDepartmentMarker(y, x, name, cadCropUrl, realPhotoUrl, description, 
     document.getElementById('modal').classList.add('active');
   });
     }
+
     // --- REGISTER DEPARTMENTS & THEIR RESPECTIVE SUB-MAP HTML FILES ---
 
  addDepartmentMarker(
